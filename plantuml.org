@@ -1,0 +1,452 @@
+#+STARTUP: inline:images
+
+* PlantUML Presentation
+
+Presented to the Logic 20/20 Developer Community
+
+July 8, 2021
+
+* Who am i?
+
+I am an Architect, currently on the Microsoft AAIG Project.
+
+I have been at Logic 20/20 for two years.
+
+* What is PlantUML?
+
+PlantUML is an open-source tool written in Java. It renders a couple
+of different DSLs into image files.
+
+It can be found at [[https://plantuml.com][its homepage]]
+
+It has a set of half-baked syntaxes for making images of various
+types.
+
+* Interesting, can you show me a sample?
+
+I certainly can. Here are a few examples which should give you a sense
+of PlantUML rendering.
+
+This is a simple Activity Diagram:
+
+#+begin_src plantuml :file simple-activity.png
+  @startuml
+  start
+
+  repeat
+          :read data;
+          :generate diagrams;
+  repeat while (more data?) is (yes)
+  ->no;
+  stop
+
+  @enduml
+#+end_src
+
+This one has more complex branching:
+
+#+begin_src plantuml :file more-complex-horizontal.png
+  @startuml
+  start
+  if (condition A) then (yes)
+          :Text 1;
+  elseif (condition B) then (yes)
+          :Text 2;
+          stop
+  elseif (condition C) then (yes)
+          :Text 3;
+  elseif (condition D) then (yes)
+          :Text 4;
+  else (nothing)
+          :Text else;
+  endif
+  stop
+  @enduml
+#+end_src
+
+This one has a more complex vertical layout:
+
+#+begin_src plantuml :file more-complex-vertical.png
+  @startuml
+!pragma useVerticalIf on
+start
+if (condition A) then (yes)
+  :Text 1;
+elseif (condition B) then (yes)
+  :Text 2;
+  stop
+elseif (condition C) then (yes)
+  :Text 3;
+elseif (condition D) then (yes)
+  :Text 4;
+else (nothing)
+  :Text else;
+endif
+stop
+@enduml
+#+end_src
+
+* Tell me more
+
+Here’s a Component Diagram which also demonstrates some grouping and
+arrows:
+
+#+begin_src plantuml :file component.png
+  @startuml
+
+  package "Some Group" {
+    HTTP - [First Component]
+    [Another Component]
+  }
+
+  node "Other Groups" {
+    FTP - [Second Component]
+    [First Component] --> FTP
+  }
+
+  cloud {
+    [Example 1]
+  }
+
+
+  database "CosmosDB" {
+    folder "This is my folder" {
+      [Folder 3]
+    }
+    frame "Foo" {
+      [Frame 4]
+    }
+  }
+
+
+  [Another Component] --> [Example 1]
+  [Example 1] --> [Folder 3]
+  [Folder 3] --> [Frame 4]
+
+  @enduml
+#+end_src
+
+* How can I actually use it?
+
+I find Sequence Diagrams clarifying:
+
+#+begin_src plantuml :file sequence.png
+  @startuml
+  title Beagle Location Add / Modify / Delete and Ingest Sequences
+
+  participant "User" as user
+
+  box "Beagle UI Service"
+          participant "User Interface" as ui
+  end box
+
+  box "Beagle API Service"
+          participant "API" as api
+  end box
+
+  queue "Kafka" as k
+
+  box "Beagle Ingest Service"
+          participant RetrieveSharepointDecks as rsd << Interceptor >>
+          participant ExtractSlides as es << Interceptor >>
+          participant StoreSlides as ss << Interceptor >>
+          participant StoreSourceDecks as sd << Interceptor >>
+  end box
+
+  box "Beagle Webhook Service"
+          participant RegisterSharepoint as rsp << Interceptor >>
+  end box
+
+  participant "Azure File Storage" as file
+  participant "Postgres" as db
+
+  box "External Resorces"
+          collections "Sharepoint" as sp
+  end box
+
+  group Location Add / Delete / Modify
+
+          user -> ui ++ : Start UI session
+          note over ui
+                  User uses UI to Add, Delete,
+                  or Modify Location
+          end note
+          ui -> api ++ : Post Add / Delete / Modify data to API
+          api -> db : Store Location Add / Delete / Modification
+          api -> k ++ : Enqueue Location Add / Delete / Modification Workitem
+          k -> rsp --++ : Dequeue Location Add / Delete / Modification Workitem
+          rsp -> sp  -- : Add or Delete Webhook
+          ui <- api -- : Return Add / Delete / Modification confirmation to UI
+          user <- ui -- : End UI Session
+  end
+
+  group Deck Ingestion
+
+          note over sp
+                  User activity outside of
+                  Beagle Creates, Modifies
+                  or Deletes Powerpoint
+                  Deck(s) in a Location
+          end note
+          sp -> api ++ : Webhook fired
+          api -> k --++ : Enqueue Ingestion Workitem
+          k -> rsd --++ : Dequeue Ingestion Workitem
+          note over rsd
+                  ,* Use Changeset token to Get Changeset
+                  ,* Filter Changeset for Powerpoint Decks
+                  ,* Store Decks in Work directory
+          end note
+          rsd -> es --++ : Extract Slides from Decks
+          note over es
+                  ,* Extract Decks into context
+                  ,* Filter Slides
+          end note
+          es -> ss --++ : Store Slides
+          ss -> api ++ : Slide Payload
+          api -> db : Store Slides in Database
+          api -> ui -- : Notify connected clients
+          ss -> sd --++ : Store Decks
+          sd -> file : Store Source Decks
+          sd -> sd --++
+          sd -> ss --++
+          ss -> es --++
+          note over es
+                  Clean up Work directory
+          end note
+          es -> rsd --++
+          note over rsd
+                  Clean up Work directory
+          end note
+  end
+  @enduml
+#+end_src
+
+* That looks kind of plain. Can it be skinned?
+
+It certainly can. Every element of the layout can be customized. You
+can modify fonts and font sizes, line weights, element spacing, everything.
+
+Additionally, there are many collections of bitmap sprites available
+including AWS and Azure resources which allow graphical elements to be
+included.
+
+#+begin_src plantuml :file skinned-sequence.png
+  @startuml
+  skinparam defaultFontName Cantarell
+  !define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons
+  !define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+  !define SPRITESURL https://raw.githubusercontent.com/plantuml-stdlib/gilbarbara-plantuml-sprites/v1.0/sprites
+  !include DEVICONS/react.puml
+  !include FONTAWESOME/users.puml
+  !include DEVICONS/clojure.puml
+  !include DEVICONS/python.puml
+  !include DEVICONS/postgresql.puml
+  !includeurl SPRITESURL/kafka.puml
+
+  !define AzurePuml https://raw.githubusercontent.com/RicardoNiepel/Azure-PlantUML/release/2-1/dist
+  !include <azure/AzureCommon.puml>
+  !include <azure/Storage/AzureFileStorage.puml>
+
+  skinparam ParticipantPadding 20
+  skinparam BoxPadding 10
+
+  title Beagle Location Add / Modify / Delete and Ingest Sequences
+
+  participant "<color:AZURE_SYMBOL_COLOR><$users></color>\nUser" as user
+
+  box "Beagle UI Service"
+          participant "<color:AZURE_SYMBOL_COLOR><$react></color>\nUser Interface" as ui
+  end box
+
+  box "Beagle API Service"
+          participant "<color:AZURE_SYMBOL_COLOR><$clojure></color>\nAPI" as api #lightblue
+  end box
+
+  queue "<$kafka>\nKafka" as k
+
+  box "Beagle Ingest Service"
+          participant RetrieveSharepointDecks as rsd << Interceptor >>
+          participant ExtractSlides as es << Interceptor >>
+          participant StoreSlides as ss << Interceptor >>
+          participant StoreSourceDecks as sd << Interceptor >>
+  end box
+
+  box "Beagle Webhook Service"
+          participant RegisterSharepoint as rsp << Interceptor >>
+  end box
+
+  participant "<color:AZURE_SYMBOL_COLOR><$AzureFileStorage></color>\nAzure File Storage" as file
+  participant "<color:AZURE_SYMBOL_COLOR><$postgresql*1.5></color>\nPostgres" as db
+
+  box "External Resorces"
+          collections "Sharepoint" as sp
+  end box
+
+  group Location Add / Delete / Modify
+
+          user -> ui ++ : Start UI session
+          note over ui
+                  User uses UI to Add, Delete,
+                  or Modify Location
+          end note
+          ui -> api ++ #lightblue : Post Add / Delete / Modify data to API
+          api -> db : Store Location Add / Delete / Modification
+          api -> k ++ : Enqueue Location Add / Delete / Modification Workitem
+          k -> rsp --++ : Dequeue Location Add / Delete / Modification Workitem
+          rsp -> sp  -- : Add or Delete Webhook
+          ui <- api -- : Return Add / Delete / Modification confirmation to UI
+          user <- ui -- : End UI Session
+  end
+
+  group Deck Ingestion
+
+          note over sp
+                  User activity outside of
+                  Beagle Creates, Modifies
+                  or Deletes Powerpoint
+                  Deck(s) in a Location
+          end note
+          sp -> api ++ #lightblue : Webhook fired
+          api -> k --++ : Enqueue Ingestion Workitem
+          k -> rsd --++ : Dequeue Ingestion Workitem
+          note over rsd
+                  ,* Use Changeset token to Get Changeset
+                  ,* Filter Changeset for Powerpoint Decks
+                  ,* Store Decks in Work directory
+          end note
+          rsd -> es --++ : Extract Slides from Decks
+          note over es
+                  ,* Extract Decks into context
+                  ,* Filter Slides
+          end note
+          es -> ss --++ : Store Slides
+          ss -> api ++ #lightblue : Slide Payload
+          api -> db : Store Slides in Database
+          api -> ui -- : Notify connected clients
+          ss -> sd --++ : Store Decks
+          sd -> file : Store Source Decks
+          sd -> sd --++
+          sd -> ss --++
+          ss -> es --++
+          note over es
+                  Clean up Work directory
+          end note
+          es -> rsd --++
+          note over rsd
+                  Clean up Work directory
+          end note
+  end
+  @enduml
+#+end_src
+
+* What other sorts of problems can it solve?
+
+PlantUML has a macro system which has allowed projects to build
+libraries around various charting standards on top of the UML it
+already supports.
+
+Here is a diagram built around the C4 standard:
+
+#+begin_src plantuml :file sequence.png
+  @startuml
+  skinparam defaultFontName Cantarell
+  skinparam Arrow {
+      Thickness 2
+      Thickness<<other>> 2
+  }
+  !define DEVICONS https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/devicons
+  !define FONTAWESOME https://raw.githubusercontent.com/tupadr3/plantuml-icon-font-sprites/master/font-awesome-5
+  !define SPRITESURL https://raw.githubusercontent.com/plantuml-stdlib/gilbarbara-plantuml-sprites/v1.0/sprites
+  !include DEVICONS/angular.puml
+  !include DEVICONS/react.puml
+  !include DEVICONS/java.puml
+  !include DEVICONS/msql_server.puml
+  !include FONTAWESOME/users.puml
+  !include DEVICONS/clojure.puml
+  !include DEVICONS/python.puml
+  !include DEVICONS/postgresql.puml
+  !includeurl SPRITESURL/kafka.puml
+
+  !define AzurePuml https://raw.githubusercontent.com/RicardoNiepel/Azure-PlantUML/release/2-1/dist
+  !include <azure/AzureCommon.puml>
+  !includeurl AzurePuml/AzureC4Integration.puml
+  !include <azure/Containers/AzureKubernetesService.puml>
+  !include <azure/identity/AzureActiveDirectory.puml>
+  !include <azure/Storage/AzureBlobStorage.puml>
+  !include <azure/Security/AzureKeyVault.puml>
+  !include <azure/General/Azure.puml>
+  !include <azure/Analytics/AzureEventHub.puml>
+  !include <azure/Analytics/AzureStreamAnalytics.puml>
+  !include <azure/Databases/AzureCosmosDb.puml>
+
+  !includeurl AzurePuml/AzureRaw.puml
+  !includeurl AzurePuml/General/Azure.puml
+
+  !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+  left to right direction
+
+  HIDE_STEREOTYPE()
+
+  Person(user, "User", "Non-admin User")
+  System_Ext(cosmos, "Bulk Search Queries", "from Cosmos")
+
+  Boundary(az, "Azure"){
+          AzureKeyVault(kv, "Key Vault", "Credential Storage")
+          AzureBlobStorage(sa, "Storage Account", "Query Storage")
+          AzureActiveDirectory(aad, "Active Directory", "Identity / Auth / Permission")
+
+          AzureKubernetesService(k8s, "Kubernetes Cluster",""){
+                  Boundary(public, "Public", "Kubernetes Namespace"){
+                          Container(ui, "Single Page App", "react", "Browser-based UI", "react")
+                          Container(api, "API", "rest/websocket", "API Server", "clojure")
+                  }
+                  Boundary(m, "Microservices", "Kubernetes Namespace"){
+                          Container(sch, "Scheduler", "kafka", "Start Tasks", "python")
+                          Container(emb, "Embeddings", "kafka", "Compute embedding functions", "python")
+                          Container(clu, "Clustering", "kafka", "Compute topic clusters", "python")
+                          Container(sco, "Scores", "kafka", "Compute scores", "python")
+                          Container(dri, "Drift", "kafka", "Compute topic drift", "python")
+                  }
+                  ContainerQueue(k, "Kafka", "https", "Message Queues", "kafka")
+                  ContainerDb(db, "Database", "odbc", "Application database", "postgresql")
+          }
+
+          Lay_R(m, db)
+          Lay_L(aad, kv)
+
+          Rel_R(api, db, "Reads and Writes", "OBBC")
+          Rel_R(api, k, "Enqueues Work", "Producer API")
+          Rel_R(api, kv, "Retrieves Credentials", "API")
+          Rel(ui, aad, "Validates via", "API")
+          Rel(user, ui, "Uses", "HTTPS")
+          Rel(ui, api, "Uses", "HTTP and Websocket")
+          Rel(sa, sch, "Notifies", "Webhook")
+          Rel(cosmos, sa, "Bulk Transfer", "TBD")
+          Rel(sch, k, "Enqueues Work", "Producer API")
+          Rel(k, emb, "Dequeues Work", "Consumer API")
+          Rel(k, clu, "Dequeues Work", "Consumer API")
+          Rel(k, sco, "Dequeues Work", "Consumer API")
+          Rel(k, dri, "Dequeues Work", "Consumer API")
+          Rel(sch, db, "Reads and Writes", "ODBC")
+          Rel(emb, db, "Reads and Writes", "ODBC")
+          Rel(clu, db, "Reads and Writes", "ODBC")
+          Rel(sco, db, "Reads and Writes", "ODBC")
+          Rel(dri, db, "Reads and Writes", "ODBC")
+
+  }
+  @enduml
+#+end_src
+
+* In conclusion
+
+PlantUML allows developers to make diagrams in a way which makes sense
+for developers.
+
+Diagrams are rendered from a source code file.
+
+This source code is text, thus you can search for it, git it... and
+you can generate it, but that’s a different presentation.
+
+The source for this presentation is available on github. Hit me up on
+teams if you’re interested.
